@@ -4,7 +4,7 @@ import MobileMenu from "./MobileMenu";
 import { useAuth } from "../../hooks/useAuth";
 
 const Navbar = () => {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, logout, isAdmin } = useAuth();
 
@@ -15,26 +15,41 @@ const Navbar = () => {
   // Define navigation links based on user role
   let navLinks = [
     { href: "/", label: "Home" },
-    { href: "/contact", label: "Contact Us" },
   ];
-
   if (user) {
-    // Add dashboard link for all authenticated users
-    navLinks.push({ href: "/dashboard", label: "Dashboard" });
-    
-    if (isAdmin()) {
+    // Add dashboard link based on user type
+    const dashboardPath = user.user_type === "admin"
+      ? "/admin/dashboard"
+      : user.user_type === "doctor"
+        ? "/doctor/dashboard"
+        : "/user/dashboard";
+    navLinks.push({ href: dashboardPath, label: "Dashboard" });
+
+    if (user.user_type === "admin") {
       // Admin-specific links
-      navLinks.push({ href: "/records", label: "Patient Records" });
+      navLinks.push({ href: "/appointment-dashboard", label: "Appointments" });
+    } else if (user.user_type === "doctor") {
+      // Add Home and Contact Us links back to the doctor navigation bar
+      navLinks = [
+        { href: "/", label: "Home" },
+        { href: "/doctor/dashboard", label: "Clinic Dashboard" },
+        { href: "/appointment-dashboard", label: "Appointments" },
+      ];
     } else {
       // Regular user links
-      navLinks.push({ href: "/appointments", label: "Appointments" });
+      navLinks.push({ href: "/appointments", label: "My Appointments" });
     }
   }
-
-  const handleLogout = (e) => {
+  const handleLogout = async (e) => {
     e.preventDefault();
-    logout();
-    // No need to redirect, AuthProvider will handle it
+    console.log("Starting logout process...");
+    try {
+      await logout();
+      console.log("Logout successful");
+      setLocation("/"); // Redirect to home page after successful logout
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   return (
@@ -50,13 +65,11 @@ const Navbar = () => {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-white${
-                location !== link.href ? "/90 hover:text-white" : ""
-              } font-medium px-2 py-1 ${
-                location === link.href
+              className={`text-white${location !== link.href ? "/90 hover:text-white text-white" : ""
+                } font-medium px-2 py-1 ${location === link.href
                   ? "border-b-2 border-white"
                   : "hover:border-b-2 hover:border-white transition-all"
-              }`}
+                }`}
             >
               {link.label}
             </Link>
@@ -65,9 +78,12 @@ const Navbar = () => {
           <div className="flex space-x-2 ml-4">
             {user ? (
               <>
-                <div className="text-white px-4 py-1.5 font-medium">
-                  Welcome, {user.username}
-                </div>
+                <Link
+                  href="/profile"
+                  className="text-white px-4 py-1.5 font-medium hover:text-[#ffd700] transition-colors"
+                >
+                  Profile
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="bg-[#ffd700] text-[#1e5631] px-4 py-1.5 rounded-md font-semibold hover:bg-[#ffff52] transition-colors"
@@ -114,10 +130,10 @@ const Navbar = () => {
       </div>
 
       {/* Mobile Navigation */}
-      <MobileMenu 
-        isOpen={mobileMenuOpen} 
-        currentPath={location} 
-        user={user} 
+      <MobileMenu
+        isOpen={mobileMenuOpen}
+        currentPath={location}
+        user={user}
         logout={handleLogout}
         navLinks={navLinks}
       />

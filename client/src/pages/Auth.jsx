@@ -7,9 +7,10 @@ const Auth = ({ type = "login" }) => {
   const { login, register } = useAuth();
   const [formData, setFormData] = useState({
     username: "",
-    email: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    email: "",
+    phoneNumber: ""
   });
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -17,8 +18,8 @@ const Auth = ({ type = "login" }) => {
   const isLogin = type === "login";
   const title = isLogin ? "Login to Your Account" : "Create an Account";
   const buttonText = isLogin ? "Login" : "Register";
-  const toggleText = isLogin 
-    ? "Don't have an account? " 
+  const toggleText = isLogin
+    ? "Don't have an account? "
     : "Already have an account? ";
   const toggleLink = isLogin ? "Register" : "Login";
   const toggleUrl = isLogin ? "/register" : "/login";
@@ -30,55 +31,94 @@ const Auth = ({ type = "login" }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const errors = {};
-    
+
     if (!formData.username.trim()) {
       errors.username = "Username is required";
-    }
-    
-    if (!isLogin && !formData.email.trim()) {
-      errors.email = "Email is required";
-    } else if (
-      !isLogin && 
-      !/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(formData.email)
-    ) {
-      errors.email = "Invalid email address";
-    }
-    
-    if (!formData.password) {
+    } if (!formData.password) {
       errors.password = "Password is required";
-    } else if (!isLogin && formData.password.length < 6) {
+    } else if (formData.password.length < 6) {
       errors.password = "Password must be at least 6 characters";
     }
-    
-    if (!isLogin && formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = "Passwords do not match";
+
+    if (!isLogin) {
+      if (!formData.confirmPassword) {
+        errors.confirmPassword = "Please confirm your password";
+      } else if (formData.password !== formData.confirmPassword) {
+        errors.confirmPassword = "Passwords do not match";
+      }
+
+      if (!formData.email.trim()) {
+        errors.email = "Email is required";
+      } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(formData.email)) {
+        errors.email = "Invalid email address";
+      }
     }
-    
+
     setFormErrors(errors);
-    
-    if (Object.keys(errors).length === 0) {
-      setIsSubmitting(true);
-      try {
-        if (isLogin) {
-          // Handle login
-          const result = await login(formData.username, formData.password);
-          if (!result.success) {
-            setFormErrors({ general: result.error || "Login failed" });
-          }
+
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      if (isLogin) {
+        const { success, error, user_type } = await login(formData.username, formData.password);
+        if (!success) {
+          setFormErrors({ general: error });
         } else {
-          // Handle registration
-          const result = await register(formData.username, formData.password);
-          if (!result.success) {
-            setFormErrors({ general: result.error || "Registration failed" });
+          if (user_type === 'admin') {
+            setLocation("/admin/dashboard");
+          } else if (user_type === 'doctor') {
+            setLocation("/doctor/dashboard");
+          } else {
+            setLocation("/user/dashboard");
           }
         }
-      } catch (error) {
-        setFormErrors({ general: error.message || "An error occurred" });
-      } finally {
-        setIsSubmitting(false);
+      } else {
+        // For registration, set default user type as "user"
+        // Admin accounts should be created through a different process
+        const { success, error, user_type } = await register(
+          formData.email,
+          formData.password,
+          "user",
+          formData.username,
+          formData.phoneNumber
+        );
+
+        if (!success) {
+          if (error.includes("Username already exists")) {
+            setFormErrors({ username: "This username is already taken. Please choose another one." });
+          } else if (error.includes("Email already")) {
+            setFormErrors({ email: "This email is already registered. Please use another email or try logging in." });
+          } else if (error.includes("password")) {
+            setFormErrors({ password: error });
+          } else if (error.includes("Failed to create user profile")) {
+            setFormErrors({ general: "There was a problem creating your account. Please try again." });
+          } else {
+            console.error("Registration error:", error);
+            setFormErrors({ general: error });
+          }
+        } else {
+          // After successful registration, redirect based on user type
+          if (user_type === 'admin') {
+            setLocation("/admin/dashboard");
+          } else if (user_type === 'doctor') {
+            setLocation("/doctor/dashboard");
+          } else {
+            // For regular users, always redirect to complete profile
+            setLocation("/complete-profile");
+          }
+        }
       }
+    } catch (error) {
+      console.error("Auth error:", error);
+      setFormErrors({ general: "An unexpected error occurred." });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -94,18 +134,16 @@ const Auth = ({ type = "login" }) => {
               <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative">
                 <span className="block sm:inline">{formErrors.general}</span>
               </div>
-            )}
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Username
-              </label>
+            )}            <div>              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+              {isLogin ? "Username or email" : "Username"}
+            </label>
               <input
                 id="username"
                 name="username"
                 type="text"
-                className={`mt-1 block w-full px-3 py-2 border ${
-                  formErrors.username ? "border-red-500" : "border-gray-300"
-                } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
+                autoComplete="username"
+                className={`mt-1 block w-full px-3 py-2 border ${formErrors.username ? "border-red-500" : "border-gray-300"
+                  } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
                 value={formData.username}
                 onChange={handleChange}
               />
@@ -114,48 +152,89 @@ const Auth = ({ type = "login" }) => {
               )}
             </div>
 
-            {!isLogin && (
+            {/* Password field for login */}
+            {isLogin && (
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Password
                 </label>
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  className={`mt-1 block w-full px-3 py-2 border ${
-                    formErrors.email ? "border-red-500" : "border-gray-300"
-                  } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
-                  value={formData.email}
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  className={`mt-1 block w-full px-3 py-2 border ${formErrors.password ? "border-red-500" : "border-gray-300"
+                    } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
+                  value={formData.password}
                   onChange={handleChange}
                 />
-                {formErrors.email && (
-                  <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
+                {formErrors.password && (
+                  <p className="mt-1 text-sm text-red-500">{formErrors.password}</p>
                 )}
               </div>
             )}
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                className={`mt-1 block w-full px-3 py-2 border ${
-                  formErrors.password ? "border-red-500" : "border-gray-300"
-                } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
-                value={formData.password}
-                onChange={handleChange}
-              />
-              {formErrors.password && (
-                <p className="mt-1 text-sm text-red-500">{formErrors.password}</p>
-              )}
-            </div>
-
+            {/* Registration form fields */}
             {!isLogin && (
               <>
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    className={`mt-1 block w-full px-3 py-2 border ${formErrors.email ? "border-red-500" : "border-gray-300"
+                      } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
+                    value={formData.email}
+                    onChange={handleChange}
+                  />
+                  {formErrors.email && (
+                    <p className="mt-1 text-sm text-red-500">{formErrors.email}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+                    Phone Number (Optional)
+                  </label>
+                  <input
+                    id="phoneNumber"
+                    name="phoneNumber"
+                    type="text"
+                    autoComplete="tel"
+                    className={`mt-1 block w-full px-3 py-2 border ${formErrors.phoneNumber ? "border-red-500" : "border-gray-300"
+                      } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
+                    value={formData.phoneNumber}
+                    onChange={handleChange}
+                  />
+                  {formErrors.phoneNumber && (
+                    <p className="mt-1 text-sm text-red-500">{formErrors.phoneNumber}</p>
+                  )}
+                </div>
+
+                {/* Password field for registration */}
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    className={`mt-1 block w-full px-3 py-2 border ${formErrors.password ? "border-red-500" : "border-gray-300"
+                      } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
+                    value={formData.password}
+                    onChange={handleChange}
+                  />
+                  {formErrors.password && (
+                    <p className="mt-1 text-sm text-red-500">{formErrors.password}</p>
+                  )}
+                </div>
+
                 <div>
                   <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                     Confirm Password
@@ -164,9 +243,9 @@ const Auth = ({ type = "login" }) => {
                     id="confirmPassword"
                     name="confirmPassword"
                     type="password"
-                    className={`mt-1 block w-full px-3 py-2 border ${
-                      formErrors.confirmPassword ? "border-red-500" : "border-gray-300"
-                    } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
+                    autoComplete="new-password"
+                    className={`mt-1 block w-full px-3 py-2 border ${formErrors.confirmPassword ? "border-red-500" : "border-gray-300"
+                      } rounded-md shadow-sm focus:outline-none focus:ring-[#1e5631] focus:border-[#1e5631]`}
                     value={formData.confirmPassword}
                     onChange={handleChange}
                   />
