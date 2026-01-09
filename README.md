@@ -39,7 +39,6 @@ This web-based system streamlines appointment scheduling and patient record mana
     VITE_SUPABASE_URL=your_project_url
     VITE_SUPABASE_ANON_KEY=your_anon_key
     ```
-    *Note: `DATABASE_URL` is configured in `drizzle.config.ts` but the app currently uses in-memory storage for users/data, while using Supabase for Authentication.*
 
 4.  **Run the application**
     ```bash
