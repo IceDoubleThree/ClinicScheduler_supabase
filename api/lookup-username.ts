@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { setSecurityHeaders } from './_lib/auth';
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase credentials');
@@ -17,8 +16,7 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
  * Security:
  * ✓ Only returns EMAIL (not password, not phone, not user type)
  * ✓ Uses service role (bypasses RLS)
- * ✓ Rate limit headers included
- * ✓ Returns generic 404 even if username doesn't exist (no enumeration)
+ * ✓ Returns 200 with null data if user not found (prevents enumeration)
  * ✓ Input validation on username
  */
 
@@ -29,6 +27,11 @@ const supabase = createClient(
 );
 
 async function handler(req: VercelRequest, res: VercelResponse) {
+  // Set security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  
   // Only allow GET
   if (req.method !== 'GET') {
     return res.status(405).json({
@@ -73,12 +76,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('username', trimmedUsername)
       .single();
 
-    // ✓ Security: Return generic 404 even if user not found
-    // This prevents username enumeration
+    // ✓ Security: Return 200 with null in both cases to prevent username enumeration
     if (error || !data) {
-      return res.status(404).json({
-        error: 'Not Found',
-        message: 'User not found',
+      return res.status(200).json({
+        data: null,
       });
     }
 
@@ -90,15 +91,12 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       },
     });
   } catch (err: any) {
-    console.error('[GET /api/lookup-username] Error:', err);
+    console.error('[GET /api/lookup-username] Error:', err.message);
 
     return res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to lookup username',
     });
-  } finally {
-    // Always set security headers
-    setSecurityHeaders(res);
   }
 }
 
