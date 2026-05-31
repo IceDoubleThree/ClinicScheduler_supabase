@@ -14,6 +14,37 @@ This web-based system streamlines appointment scheduling and patient record mana
 - Responsive UI using Tailwind CSS and shadcn/ui components
 - Clear validations, toasts, and loading states for better UX
 
+## Setup and Installation
+
+### Prerequisites
+- Node.js
+- npm
+
+### Installation
+
+1.  **Clone the repository**
+    ```bash
+    git clone <repository-url>
+    cd ClinicScheduler
+    ```
+
+2.  **Install dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Environment Configuration**
+    Create a `.env` file in the root directory. You need Supabase credentials:
+    ```env
+    VITE_SUPABASE_URL=your_project_url
+    VITE_SUPABASE_ANON_KEY=your_anon_key
+    ```
+
+4.  **Run the application**
+    ```bash
+    npm run dev
+    ```
+    Access the app at `http://localhost:5000`.
 
 ## Updates
 December 19, 2025

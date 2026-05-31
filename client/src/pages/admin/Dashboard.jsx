@@ -203,14 +203,12 @@ const AdminDashboard = () => {
         .select("appointment_id", { count: "exact" });
 
       if (totalError) throw totalError;
-      console.log("Total Appointments Query Result:", totalCount);
 
       const { count: pendingCount, error: pendingError } = await supabase
         .from("appointment_queue")
         .select("queue_id", { count: "exact" });
 
       if (pendingError) throw pendingError;
-      console.log("Pending Appointments Query Result:", pendingCount);
 
       setStats(prevStats => ({
         ...prevStats,

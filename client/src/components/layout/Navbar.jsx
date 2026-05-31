@@ -42,10 +42,8 @@ const Navbar = () => {
   }
   const handleLogout = async (e) => {
     e.preventDefault();
-    console.log("Starting logout process...");
     try {
       await logout();
-      console.log("Logout successful");
       setLocation("/"); // Redirect to home page after successful logout
     } catch (error) {
       console.error("Logout error:", error);

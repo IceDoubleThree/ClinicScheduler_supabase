@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/use-toast";
 
 const Auth = ({ type = "login" }) => {
   const [location, setLocation] = useLocation();
   const { login, register } = useAuth();
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -72,7 +74,17 @@ const Auth = ({ type = "login" }) => {
         const { success, error, user_type } = await login(formData.username, formData.password);
         if (!success) {
           setFormErrors({ general: error });
+          toast({
+            variant: "destructive",
+            title: "Login Failed",
+            description: error
+          });
         } else {
+          toast({
+            variant: "success",
+            title: "Success",
+            description: "Logged in successfully"
+          });
           if (user_type === 'admin') {
             setLocation("/admin/dashboard");
           } else if (user_type === 'doctor') {
@@ -95,17 +107,47 @@ const Auth = ({ type = "login" }) => {
         if (!success) {
           if (error.includes("Username already exists")) {
             setFormErrors({ username: "This username is already taken. Please choose another one." });
+            toast({
+              variant: "destructive",
+              title: "Username Taken",
+              description: "This username is already taken. Please choose another one."
+            });
           } else if (error.includes("Email already")) {
             setFormErrors({ email: "This email is already registered. Please use another email or try logging in." });
+            toast({
+              variant: "destructive",
+              title: "Email Already Registered",
+              description: "This email is already registered. Please use another email or try logging in."
+            });
           } else if (error.includes("password")) {
             setFormErrors({ password: error });
+            toast({
+              variant: "destructive",
+              title: "Password Error",
+              description: error
+            });
           } else if (error.includes("Failed to create user profile")) {
             setFormErrors({ general: "There was a problem creating your account. Please try again." });
+            toast({
+              variant: "destructive",
+              title: "Account Creation Failed",
+              description: "There was a problem creating your account. Please try again."
+            });
           } else {
             console.error("Registration error:", error);
             setFormErrors({ general: error });
+            toast({
+              variant: "destructive",
+              title: "Registration Failed",
+              description: error
+            });
           }
         } else {
+          toast({
+            variant: "success",
+            title: "Success",
+            description: "Account created successfully"
+          });
           // After successful registration, redirect based on user type
           if (user_type === 'admin') {
             setLocation("/admin/dashboard");
@@ -120,6 +162,11 @@ const Auth = ({ type = "login" }) => {
     } catch (error) {
       console.error("Auth error:", error);
       setFormErrors({ general: "An unexpected error occurred." });
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred."
+      });
     } finally {
       setIsSubmitting(false);
     }

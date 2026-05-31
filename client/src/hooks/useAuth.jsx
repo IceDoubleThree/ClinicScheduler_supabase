@@ -53,41 +53,48 @@ export const AuthProvider = ({ children }) => {
         throw new Error("Username/Email and password are required");
       }
 
-      // First find the user to get their email
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("email, user_type, username")
-        .or(`username.eq."${identifier}",email.eq."${identifier}"`)
-        .single();
+      let loginEmail = identifier;
+      const isEmail = identifier.includes('@');
 
-      if (userError || !userData) {
-        console.error("User lookup error:", userError);
-        throw new Error("Invalid username/email or password");
+      // Only query the database if they are trying to log in with a username
+      if (!isEmail) {
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("email")
+          .eq("username", identifier)
+          .single();
+
+        if (userError || !userData) {
+          throw new Error("Invalid username or password");
+        }
+        loginEmail = userData.email;
       }
 
-      // Then attempt to sign in with Supabase Auth
+      // Now attempt to sign in with Supabase Auth
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: userData.email,
+        email: loginEmail,
         password,
       });
 
       if (authError) {
-        console.error("Auth error:", authError);
-        throw new Error("Invalid username/email or password");
+        throw new Error("Invalid credentials");
       }
 
-      if (!data?.user) {
-        throw new Error("Login failed");
-      }
+      // Fetch the rest of the user details AFTER successful authentication
+      // Now that they are logged in, RLS will allow this read
+      const { data: profileData } = await supabase
+        .from("users")
+        .select("username, user_type")
+        .eq("id", data.user.id)
+        .single();
 
-      // Set user state with the correct information
       setUser({
         id: data.user.id,
-        username: userData.username,
-        user_type: userData.user_type
+        username: profileData?.username || identifier,
+        user_type: profileData?.user_type || 'user'
       });
 
-      return { success: true, user_type: userData.user_type };
+      return { success: true, user_type: profileData?.user_type };
     } catch (error) {
       console.error("Login error:", error);
       return { success: false, error: error.message };
@@ -97,28 +104,8 @@ export const AuthProvider = ({ children }) => {
   };  // Register function
   const register = async (email, password, user_type, username, phoneNumber) => {
     try {
-      // First check if username or email already exists
-      const { data: existingUser, error: checkError } = await supabase
-        .from("users")
-        .select("username, email")
-        .or(`username.eq."${username}",email.eq."${email}"`)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error("User check error:", checkError);
-        throw new Error("Failed to check existing user");
-      }
-
-      if (existingUser) {
-        if (existingUser.username === username) {
-          throw new Error("Username already exists");
-        }
-        if (existingUser.email === email) {
-          throw new Error("Email already exists");
-        }
-      }
-
-      // Sign up user with Supabase Auth
+      // Sign up user with Supabase Auth first
+      // This will reject duplicate emails automatically
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -142,6 +129,7 @@ export const AuthProvider = ({ children }) => {
 
       try {
         // Insert user into our custom users table with phone
+        // This will fail if username is not unique (database constraint)
         const { error: insertError } = await supabase
           .from("users")
           .insert({
@@ -149,13 +137,19 @@ export const AuthProvider = ({ children }) => {
             email: email,
             username: username,
             user_type: user_type,
-            phone: phoneNumber || null  // Store phone in public.users
+            phone: phoneNumber || null
           });
 
         if (insertError) {
           console.error("User insert error:", insertError);
           // If insertion fails, clean up the auth user
           await supabase.auth.signOut();
+          
+          // Check if it's a username uniqueness error
+          if (insertError.message.includes("username")) {
+            throw new Error("Username already exists");
+          }
+          
           throw new Error("Failed to create user profile: " + insertError.message);
         }
 
