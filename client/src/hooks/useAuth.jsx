@@ -56,18 +56,24 @@ export const AuthProvider = ({ children }) => {
       let loginEmail = identifier;
       const isEmail = identifier.includes('@');
 
-      // Only query the database if they are trying to log in with a username
+      // Only query the API if they are trying to log in with a username
       if (!isEmail) {
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("email")
-          .eq("username", identifier)
-          .single();
+        try {
+          const response = await fetch(
+            `/api/lookup-username?username=${encodeURIComponent(identifier)}`
+          );
 
-        if (userError || !userData) {
+          const { data } = await response.json();
+          
+          // If data is null, user doesn't exist
+          if (!data || !data.email) {
+            throw new Error("Invalid username or password");
+          }
+          
+          loginEmail = data.email;
+        } catch (err) {
           throw new Error("Invalid username or password");
         }
-        loginEmail = userData.email;
       }
 
       // Now attempt to sign in with Supabase Auth
