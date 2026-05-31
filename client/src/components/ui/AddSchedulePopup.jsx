@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/hooks/use-toast";
 
 const AddSchedulePopup = ({ onClose, onSave }) => {
     const { toast } = useToast();

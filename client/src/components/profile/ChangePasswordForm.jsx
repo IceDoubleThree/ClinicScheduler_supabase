@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/hooks/use-toast";
 
 const ChangePasswordForm = ({ onClose }) => {
     const { toast } = useToast();
