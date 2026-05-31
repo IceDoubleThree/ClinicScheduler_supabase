@@ -1,10 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing Supabase credentials');
-}
-
 /**
  * ============================================================
  * PUBLIC ENDPOINT: Username to Email Lookup
@@ -19,12 +15,6 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
  * ✓ Returns 200 with null data if user not found (prevents enumeration)
  * ✓ Input validation on username
  */
-
-// Use service role key to bypass RLS (server-side lookup)
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
 
 async function handler(req: VercelRequest, res: VercelResponse) {
   // Set security headers
@@ -41,6 +31,21 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Check for required environment variables
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Missing Supabase credentials in environment');
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'Database configuration error',
+      });
+    }
+
+    // Create Supabase client with service role
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
     const { username } = (req.query || {}) as { username?: string };
 
     // Validate input
